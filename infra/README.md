@@ -14,7 +14,7 @@ scripts/run_local.sh
 
 - API on http://127.0.0.1:8000, website on http://127.0.0.1:8501.
 - Loads a 30-day licence signed with your key (`~/.scam-map/license.key`). Demo data is loaded only the first time;
-  after that your own reports are kept. `--fresh` clears everything and reloads demo data.
+  after that your own reports are kept. `--fresh` clears everything and reloads demo data; `--empty` clears everything and loads none.
 - Data, the local HMAC key and the licence file live in `.local/` (gitignored). Ctrl+C stops everything.
 
 ## Option 2: the two containers

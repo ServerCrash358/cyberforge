@@ -4,6 +4,7 @@
 #   scripts/run_local.sh            start with everything you entered before; demo data only the
 #                                   first time, when the database is new
 #   scripts/run_local.sh --fresh    DELETE every report and challenge, then load fresh demo data
+#   scripts/run_local.sh --empty    DELETE every report and challenge and load NO demo data (for judging)
 # Your own reports are never deleted unless you pass --fresh.
 # Other machines on the same Wi-Fi can reach both servers: the banner at the end prints the address
 # to curl. SCAM_MAP_HOST=127.0.0.1 scripts/run_local.sh keeps them on this laptop only.
@@ -47,10 +48,11 @@ fi
 case "${1:-}" in
   "") SEED=no ;;
   --fresh) SEED=yes ;;
-  *) echo "usage: $0 [--fresh]" >&2; exit 2 ;;
+  --empty) SEED=empty ;;
+  *) echo "usage: $0 [--fresh | --empty]" >&2; exit 2 ;;
 esac
-# A brand-new database gets demo data so there is something to look at.
-[ -f "$LOCAL/scam_map.sqlite" ] || SEED=yes
+# A brand-new database gets demo data so there is something to look at, unless --empty was asked.
+[ -f "$LOCAL/scam_map.sqlite" ] || [ "$SEED" = empty ] || SEED=yes
 
 API_PID=""
 cleanup() {
@@ -77,11 +79,15 @@ curl -s -X POST -H 'content-type: application/json' --data-binary "@$LOCAL/licen
   "http://127.0.0.1:$API_PORT/license"
 echo
 
-if [ "$SEED" = yes ]; then
+if [ "$SEED" = empty ]; then
+  echo "== Clearing the database; no demo data (the licence is kept)"
+  curl -s -X POST "http://127.0.0.1:$API_PORT/admin/reset"
+  echo
+elif [ "$SEED" = yes ]; then
   echo "== Loading demo data (this clears the local database)"
   (cd judge && uv run python seed_demo.py --target "http://127.0.0.1:$API_PORT")
 else
-  echo "== Keeping your existing data (scripts/run_local.sh --fresh would clear it and load demo data)"
+  echo "== Keeping your existing data (--fresh clears it and loads demo data; --empty clears it and loads nothing)"
 fi
 
 echo

@@ -49,7 +49,7 @@ website on :8501, loads a licence signed with your key, fills in demo data and p
 scripts/run_local.sh
 ```
 
-Next time it keeps everything you entered; `--fresh` clears it all and reloads demo data. The steps below do the
+Next time it keeps everything you entered; `--fresh` clears it all and reloads demo data; `--empty` clears it and loads nothing (use it for judging). The steps below do the
 same by hand.
 
 ```bash
