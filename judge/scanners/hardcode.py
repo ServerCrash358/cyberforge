@@ -1,20 +1,20 @@
-"""No literal phone number, UPI ID, link or sender ID in api/app; they live only in shared/data.
+"""No literal phone number, UPI ID, link or sender ID in the API; they live only in shared/data.
 
 The PRD checks for code like `if number == "+919876543210"`. This reads every string literal
-in api/app and fails on anything shaped like an identifier, and on any value from the
-verified list or the short-code allowlist.
+in api-rs/src (outside its test modules) and fails on anything shaped like an identifier, and
+on any value from the verified list or the short-code allowlist.
 
-Owner: B. Filled in by: B7.
+Owner: B. Filled in by: B7, R5 (Rust source).
 """
 
 from __future__ import annotations
 
-import ast
 import json
 import re
 from pathlib import Path
 
 from contract import REPO
+from scanners.rust_source import SOURCE, source_files, string_literals
 
 SHAPES = {
     "phone number": re.compile(r"(?<!\d)(\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}(?!\d)"),
@@ -37,22 +37,12 @@ def _listed_values() -> set[str]:
     return values
 
 
-def _literals(path: Path) -> list[tuple[int, str]]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    return [
-        (n.lineno, n.value)
-        for n in ast.walk(tree)
-        if isinstance(n, ast.Constant) and isinstance(n.value, str)
-    ]
-
-
 def scan(root: Path | None = None) -> list[str]:
-    root = root or REPO / "api" / "app"
     listed = _listed_values()
     findings = []
-    for path in sorted(root.rglob("*.py")):
+    for path in source_files(root or SOURCE):
         where = path.relative_to(REPO) if path.is_relative_to(REPO) else path
-        for line, text in _literals(path):
+        for line, text in string_literals(path):
             for name, pattern in SHAPES.items():
                 if pattern.search(text):
                     findings.append(f"{where}:{line} has a {name} literal")

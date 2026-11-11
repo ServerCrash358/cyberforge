@@ -1,9 +1,9 @@
 """Offline: generates the Ed25519 key pair.
 The private key goes to ~/.scam-map/license.key, never the repo.
-Writes the public key for api/app/license/public_key.pem.
+Writes the public key to api-rs/public_key.pem, which is built into the server.
 
 Run once, on your laptop:
-    uv run --project api python scripts/license_keygen.py
+    uv run --project judge python scripts/license_keygen.py
 
 Owner: B. Filled in by: B3.
 """
@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_KEY = Path.home() / ".scam-map" / "license.key"
-DEFAULT_PUBLIC = REPO / "api" / "app" / "license" / "public_key.pem"
+DEFAULT_PUBLIC = REPO / "api-rs" / "public_key.pem"
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -33,6 +33,7 @@ from jsonschema import Draft202012Validator
 
 REPO = Path(__file__).resolve().parent.parent
 CONTRACT_DIR = REPO / "shared" / "contract"
+API = REPO / "api-rs"
 
 
 class Response(Protocol):
@@ -448,14 +449,13 @@ def _free_port() -> int:
 
 @contextmanager
 def local_server(workdir: Path | None = None) -> Iterator[str]:
-    """Start the API from ../api on a free port with a throwaway database.
+    """Start the Rust API from ../api-rs on a free port with a throwaway database.
 
     With a workdir, the database (scam_map.sqlite) and everything the server prints
-    (server.log, at info level) stay there afterwards for the privacy scanners.
-    Runs the API venv's Python directly rather than through `uv run`: on Windows, stopping
-    `uv` leaves its uvicorn child running.
+    (server.log) stay there afterwards for the privacy scanners. The release binary is built
+    first (cargo does nothing when it is current), so timings are those of the real server.
     """
-    python = _api_python()
+    binary = _api_binary()
     port = _free_port()
     signing_key = Ed25519PrivateKey.generate()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -471,21 +471,12 @@ def local_server(workdir: Path | None = None) -> Iterator[str]:
             "SCAM_MAP_DB_PATH": str(folder / "scam_map.sqlite"),
             "SCAM_MAP_HMAC_KEY": secrets.token_hex(32),
             "SCAM_MAP_LICENSE_PUBLIC_KEY": str(public_pem),
+            "SCAM_MAP_HOST": "127.0.0.1",
+            "SCAM_MAP_PORT": str(port),
         }
-        args = [
-            str(python),
-            "-m",
-            "uvicorn",
-            "app.main:app",
-            "--port",
-            str(port),
-            "--no-access-log",
-            "--log-level",
-            "info" if workdir else "warning",
-        ]
         with open(folder / "server.log", "wb") as log:
             proc = subprocess.Popen(
-                args, cwd=REPO / "api", env=env, stdout=log, stderr=subprocess.STDOUT
+                [str(binary)], cwd=API, env=env, stdout=log, stderr=subprocess.STDOUT
             )
             try:
                 base = f"http://127.0.0.1:{port}"
@@ -518,17 +509,17 @@ def _install_licence(base: str, key: Ed25519PrivateKey) -> None:
         raise SystemExit(f"local server refused the test licence: {response.text}")
 
 
-def _api_python() -> Path:
-    """The API venv's interpreter, creating the venv from uv.lock if it is missing."""
-    api = REPO / "api"
-    venv = api / ".venv"
-    python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    if not python.exists():
-        uv = shutil.which("uv")
-        if uv is None:
-            raise SystemExit("uv is not on PATH and api/.venv does not exist")
-        subprocess.run([uv, "sync", "--frozen"], cwd=api, check=True)
-    return python
+def _cargo() -> str:
+    found = shutil.which("cargo") or str(Path.home() / ".cargo" / "bin" / "cargo")
+    if not Path(found).exists() and shutil.which(found) is None:
+        raise SystemExit("cargo is not installed; see docs/SETUP.md")
+    return found
+
+
+def _api_binary() -> Path:
+    """The release build of the API, built from Cargo.lock if missing or out of date."""
+    subprocess.run([_cargo(), "build", "--release", "--locked", "--quiet"], cwd=API, check=True)
+    return API / "target" / "release" / ("scam-map-api.exe" if os.name == "nt" else "scam-map-api")
 
 
 def _wait_ready(base: str, proc: subprocess.Popen[bytes]) -> None:

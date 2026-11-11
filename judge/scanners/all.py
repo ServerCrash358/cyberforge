@@ -50,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     seeds, salt = load_seeds(args.seeds), secrets.token_hex(4)
 
-    results: dict[str, list[str]] = {"hardcoding (api/app)": hardcode.scan()}
+    results: dict[str, list[str]] = {"hardcoding (api-rs)": hardcode.scan()}
     if args.target == "local":
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             folder = Path(tmp)

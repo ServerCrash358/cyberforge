@@ -87,3 +87,30 @@ Python client in between. The generated scripts, one literal curl command per li
 
 Phase 1 loads and scores each dataset on its own (the checks assume one at a time). Phase 2 loads all five together
 for browsing and is not scored.
+
+## Rust API parity (plan R5), local, 11 Nov
+
+The Rust server in `api-rs/` run through the same judge tools that scored the Python one. The tools now build and
+start the Rust release binary (`judge/contract.py` `local_server()`).
+
+| Check | Rust | Python (earlier runs) |
+| --- | --- | --- |
+| Contract (`contract.py`) | 33/33 | 33/33 |
+| Simulator, held-out seeds 101 to 150 | 750/750, all 15 families 100%, 82.0/82 | 750/750, 82.0/82 |
+| Metamorphic, held-out seeds | 1,600/1,600 identical | 1,600/1,600 |
+| Privacy scanners (hardcoding now reads the Rust source) | 0 findings in all five | 0 findings |
+| Five datasets, Python client (`score_dataset.py`) | 121/121 | 121/121 |
+| Five datasets, plain curl (`scripts/curl_load.sh`) | 116/116, 0 unexpected statuses | 116/116 |
+
+Speed, both servers on this laptop with the same 20,000-report load (`perf.py --reports 20000`):
+
+| | Python | Rust |
+| --- | --- | --- |
+| Load rate | 173/s | 315/s |
+| Report p50 / p95 | 10.0 / 12.4 ms | 7.2 / 10.0 ms |
+| Lookup p50 / p95 | 2.2 / 3.9 ms | 0.7 / 1.3 ms |
+| Map p50 / p95 | 4.8 / 9.6 ms | 3.4 / 7.6 ms |
+
+At 100,000 reports the Rust server loads at 58/s (report p50 32 ms; lookup p95 1.7 ms, map p95 32.8 ms). Writes slow
+down as an area's history grows because every accepted report re-reads the area's last 31 days of reports to check for
+new alerts for the live panel. Both servers do this; the 379/s in the B8 run above predates the live panel.

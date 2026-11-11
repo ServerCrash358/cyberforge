@@ -7,14 +7,13 @@ echo "== Repo scans"
 if git ls-files | grep -E '\.key$|\.env$' ; then echo "secret file tracked"; exit 1; fi
 if git grep -n "BEGIN PRIVATE KEY" -- . ':!docs' ':!scripts/check.sh' ':!scripts/license_keygen.py' ; then echo "private key in repo"; exit 1; fi
 
-echo "== API"
-(cd api
-  uv sync --frozen
-  uv run ruff check .
-  uv run ruff format --check .
-  uv run mypy --strict app
-  uv run pytest -q -W error --cov=app/core --cov=app/license --cov-fail-under=90
-  uv run pip-audit)
+echo "== API (Rust)"
+export PATH="$HOME/.cargo/bin:$PATH"
+(cd api-rs
+  cargo fmt --check
+  cargo clippy --locked --all-targets -- -D warnings
+  cargo test --locked --quiet
+  cargo audit --deny warnings)
 
 echo "== Judge (in-process, held-out seeds)"
 (cd judge

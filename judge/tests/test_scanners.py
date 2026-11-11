@@ -26,18 +26,21 @@ def reply(path: str, body: object, status: int = 200) -> Exchange:
 
 
 def test_hardcoded_number_is_found(tmp_path: Path) -> None:
-    (tmp_path / "rules.py").write_text(
-        "def verdict(number: str) -> str:\n"
-        '    if number == "+919876543210":\n'
-        '        return "SUSPICIOUS"\n'
-        '    if number == "1930":\n'
-        '        return "VERIFIED_BUSINESS"\n'
-        '    return "NO_REPORTS"\n',
+    (tmp_path / "rules.rs").write_text(
+        "// a comment with +919812345678 is not a literal\n"
+        "fn verdict(number: &str) -> &'static str {\n"
+        '    if number == "+919876543210" { return "SUSPICIOUS"; }\n'
+        '    if number == r"1930" { return "VERIFIED_BUSINESS"; }\n'
+        '    "NO_REPORTS"\n'
+        "}\n"
+        "#[cfg(test)]\n"
+        'mod tests { const EXAMPLE: &str = "+919000000001"; }\n',
         encoding="utf-8",
     )
     findings = hardcode.scan(tmp_path)
-    assert any("phone number" in f for f in findings)
-    assert any("'1930'" in f for f in findings)
+    assert any("rules.rs:3 has a phone number" in f for f in findings), findings
+    assert any("'1930'" in f for f in findings), findings
+    assert not any("9812345678" in f or "9000000001" in f for f in findings), findings
 
 
 def test_real_api_code_is_clean() -> None:

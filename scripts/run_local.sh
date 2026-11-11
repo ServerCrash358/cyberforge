@@ -20,9 +20,12 @@ mkdir -p "$LOCAL"
 
 if [ ! -f "$KEY" ]; then
   echo "No licence key at $KEY. Make one first:" >&2
-  echo "  uv run --project api python scripts/license_keygen.py" >&2
+  echo "  uv run --project judge python scripts/license_keygen.py" >&2
   exit 1
 fi
+
+# cargo installs to ~/.cargo/bin; a shell opened before Rust was installed may not have it yet.
+export PATH="$HOME/.cargo/bin:$PATH"
 
 venv_python() {
   if [ -x "$1/.venv/Scripts/python.exe" ]; then echo "$1/.venv/Scripts/python.exe"; else echo "$1/.venv/bin/python"; fi
@@ -32,17 +35,17 @@ HOST=${SCAM_MAP_HOST:-0.0.0.0}  # 0.0.0.0: reachable from the Wi-Fi; 127.0.0.1: 
 
 # The address other machines on the Wi-Fi use: the one this laptop would send from.
 lan_ip() {
-  uv run --project api python -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255', 1)); print(s.getsockname()[0])" 2>/dev/null || echo 127.0.0.1
+  uv run --project judge python -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('10.255.255.255', 1)); print(s.getsockname()[0])" 2>/dev/null || echo 127.0.0.1
 }
 
-echo "== Installing locked dependencies"
-(cd api && uv sync --frozen --quiet)
+echo "== Building the API and installing locked dependencies"
+(cd api-rs && cargo build --release --locked --quiet)
 (cd web && uv sync --frozen --quiet)
 (cd judge && uv sync --frozen --quiet)
 
 # One HMAC key for this laptop, kept so stored reports stay reachable between runs.
 if [ ! -f "$LOCAL/hmac.key" ]; then
-  uv run --project api python -c "import secrets; print(secrets.token_hex(32))" > "$LOCAL/hmac.key"
+  uv run --project judge python -c "import secrets; print(secrets.token_hex(32))" > "$LOCAL/hmac.key"
 fi
 
 case "${1:-}" in
@@ -62,9 +65,8 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "== Starting the API on port $API_PORT (listening on $HOST)"
-(cd api && SCAM_MAP_DB_PATH="../$LOCAL/scam_map.sqlite" SCAM_MAP_HMAC_KEY="$(cat "../$LOCAL/hmac.key")" \
-  exec "$(venv_python .)" -m uvicorn app.main:app --host "$HOST" --port "$API_PORT" \
-  --no-access-log --log-level warning) &
+(cd api-rs && SCAM_MAP_DB_PATH="../$LOCAL/scam_map.sqlite" SCAM_MAP_HMAC_KEY="$(cat "../$LOCAL/hmac.key")" \
+  SCAM_MAP_HOST="$HOST" SCAM_MAP_PORT="$API_PORT" exec ./target/release/scam-map-api) &
 API_PID=$!
 for _ in $(seq 1 60); do
   curl -sf "http://127.0.0.1:$API_PORT/health" >/dev/null && break
@@ -73,7 +75,7 @@ done
 curl -sf "http://127.0.0.1:$API_PORT/health" >/dev/null || { echo "API did not start" >&2; exit 1; }
 
 echo "== Loading a 30-day licence signed with your key"
-uv run --project api python scripts/license_sign.py --licensee "Local demo" --expires-in 30d \
+uv run --project judge python scripts/license_sign.py --licensee "Local demo" --expires-in 30d \
   --out "$LOCAL/licence-local.json" >/dev/null
 curl -s -X POST -H 'content-type: application/json' --data-binary "@$LOCAL/licence-local.json" \
   "http://127.0.0.1:$API_PORT/license"

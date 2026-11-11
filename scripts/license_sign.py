@@ -1,12 +1,12 @@
 """Offline: signs {licensee, expires_at} with the private key and writes a licence JSON file.
 
 Examples, on your laptop:
-    uv run --project api python scripts/license_sign.py --licensee "Demo Bank" --expires-in 5m \
+    uv run --project judge python scripts/license_sign.py --licensee "Demo Bank" --expires-in 5m \
         --out licence-5min.json
-    uv run --project api python scripts/license_sign.py --licensee "Demo Bank" --expires-in 365d \
+    uv run --project judge python scripts/license_sign.py --licensee "Demo Bank" --expires-in 365d \
         --out licence-long.json
 
-Owner: B. Filled in by: B3.
+Owner: B. Filled in by: B3, R5 (no longer imports the Python API).
 """
 
 from __future__ import annotations
@@ -35,11 +35,13 @@ def parse_duration(text: str) -> timedelta:
     return timedelta(**{UNITS[match.group(2)]: int(match.group(1))})
 
 
-def main(argv: list[str] | None = None) -> int:
-    # The server's own canonical form, so a signed licence always verifies there.
-    sys.path.insert(0, str(REPO / "api"))
-    from app.license.verify import canonical_bytes
+def canonical_bytes(licensee: str, expires_at: str) -> bytes:
+    """The exact bytes that are signed; api-rs/src/license/verify.rs builds the same ones."""
+    doc = {"licensee": licensee, "expires_at": expires_at}
+    return json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Sign a licence file.")
     parser.add_argument("--licensee", required=True)
     when = parser.add_mutually_exclusive_group(required=True)

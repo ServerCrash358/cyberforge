@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shows, in files you can open, that nothing a reporter sends ends up in logs or the database.
 #   scripts/privacy_check.sh [dataset.json]     default: judge/datasets/05_judging_day.json
-# Starts a separate API on :8100 logging everything at info level to .local/privacy/server.log,
+# Starts a separate API on :8100 writing everything it prints to .local/privacy/server.log,
 # loads the dataset (every report has reporter_id, ip_prefix, note and a phone number or UPI),
 # then searches the log and the raw database bytes for every value that was sent.
 # Owner: B. Filled in by: B7.
@@ -13,19 +13,16 @@ OUT=.local/privacy
 PORT=8100
 rm -rf "$OUT" && mkdir -p "$OUT"
 
-python_of() {
-  if [ -x "$1/.venv/Scripts/python.exe" ]; then echo "$1/.venv/Scripts/python.exe"; else echo "$1/.venv/bin/python"; fi
-}
-
-KEY=$(uv run --project api python -c "import secrets; print(secrets.token_hex(32))")
-(cd api && SCAM_MAP_DB_PATH="../$OUT/scam_map.sqlite" SCAM_MAP_HMAC_KEY="$KEY" \
-  exec "$(python_of .)" -m uvicorn app.main:app --port "$PORT" --no-access-log --log-level info \
-  > "../$OUT/server.log" 2>&1) &
+export PATH="$HOME/.cargo/bin:$PATH"
+(cd api-rs && cargo build --release --locked --quiet)
+KEY=$(uv run --project judge python -c "import secrets; print(secrets.token_hex(32))")
+(cd api-rs && SCAM_MAP_DB_PATH="../$OUT/scam_map.sqlite" SCAM_MAP_HMAC_KEY="$KEY" \
+  SCAM_MAP_PORT="$PORT" exec ./target/release/scam-map-api > "../$OUT/server.log" 2>&1) &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null || true; wait $API_PID 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$PORT/health" >/dev/null && break; sleep 0.5; done
 
-uv run --project api python scripts/license_sign.py --licensee "Privacy check" --expires-in 1d \
+uv run --project judge python scripts/license_sign.py --licensee "Privacy check" --expires-in 1d \
   --out "$OUT/licence.json" >/dev/null
 curl -s -o /dev/null -X POST -H 'content-type: application/json' --data-binary "@$OUT/licence.json" \
   "http://127.0.0.1:$PORT/license"
