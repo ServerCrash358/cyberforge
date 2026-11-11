@@ -1,0 +1,12 @@
+-- Initial schema for the Community Scam Map (SQLite, WAL mode).
+-- Tables, per docs/ARCHITECTURE.md "Data model":
+--   reports        one row per accepted report; HMACs, note fingerprint, cluster, weight, status
+--   cases          one row per identifier; counts, weighted score, verdict, challenged
+--   area_day       pincode, day, scam type, trusted count (feeds /map and /alerts)
+--   areas          reference data: pincode, locality, city, lat, lng, source (kept on reset)
+--   verified       Appendix C values (kept on reset)
+--   challenges     disputes; claimant contact never returned or logged (cleared on reset)
+--   rate_counters  reporter HMAC, hour, count (expire after a day)
+--   license_state  current licence JSON and high-water time (kept on reset)
+-- No DDL yet.
+-- Owner: B. Filled in by: B0 (tables added by the task that first needs them).

@@ -1,0 +1,39 @@
+# Rust API: the PRD routes, trust rules and licence, replacing api/ (plan phase R0 onward).
+# Exact versions only; cargo audit must show 0 findings before a new dependency is added.
+
+[package]
+name = "scam-map-api"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "=0.8.9"
+base64 = "=0.23.1"
+blake2 = "=0.11.0"
+ed25519-dalek = { version = "=3.0.0", features = ["pkcs8", "pem"] }
+getrandom = "=0.4.3"
+hex = "=0.4.3"
+hmac = "=0.13.0"
+regex = "=1.13.1"
+rusqlite = { version = "=0.42.0", features = ["bundled"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+serde_urlencoded = "=0.7.1"
+sha2 = "=0.11.1"
+time = { version = "=0.3.55", features = ["macros"] }
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+unicode-general-category = "=1.1.0"
+
+[dev-dependencies]
+http-body-util = "=0.1.5"
+tempfile = "=3.27.0"
+tower = { version = "=0.5.3", features = ["util"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Every pure function would need #[must_use]; that suits a published library, not this app.
+must_use_candidate = "allow"

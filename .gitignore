@@ -26,3 +26,6 @@ data/urlhaus/
 
 # Local run data (scripts/run_local.sh)
 .local/
+
+# Rust build output
+target/
