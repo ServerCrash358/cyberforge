@@ -440,6 +440,12 @@ def run(client: Client) -> list[Result]:
     return results
 
 
+def admin_headers() -> dict[str, str]:
+    """The token a public server wants on /admin/reset (SCAM_MAP_ADMIN_TOKEN); none locally."""
+    token = os.environ.get("SCAM_MAP_ADMIN_TOKEN", "")
+    return {"x-admin-token": token} if token else {}
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -558,9 +564,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.target == "local":
-        with local_server() as base, httpx.Client(base_url=base, timeout=10) as client:
+        with (
+            local_server() as base,
+            httpx.Client(headers=admin_headers(), base_url=base, timeout=10) as client,
+        ):
             return _report(run(client), f"local ({base})")
-    with httpx.Client(base_url=args.target.rstrip("/"), timeout=10) as client:
+    with httpx.Client(
+        headers=admin_headers(), base_url=args.target.rstrip("/"), timeout=10
+    ) as client:
         return _report(run(client), args.target)
 
 

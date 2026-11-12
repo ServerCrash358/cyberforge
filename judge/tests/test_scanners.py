@@ -43,6 +43,21 @@ def test_hardcoded_number_is_found(tmp_path: Path) -> None:
     assert not any("9812345678" in f or "9000000001" in f for f in findings), findings
 
 
+def test_website_text_is_scanned_but_comments_are_not(tmp_path: Path) -> None:
+    page = tmp_path / "Page.tsx"
+    page.write_text(
+        '// the words "scammer" and "fraud" are banned\n'
+        "export const BANNED_WORDS = ['scammer', 'fraud'];\n"
+        "export const Title = () => <h1>Fraud alert</h1>;\n",
+        encoding="utf-8",
+    )
+    assert wording._hits(wording._shown_text(page)) == ["fraud"]
+
+
+def test_real_website_text_is_clean() -> None:
+    assert wording.scan([]) == []
+
+
 def test_real_api_code_is_clean() -> None:
     assert hardcode.scan() == []
 

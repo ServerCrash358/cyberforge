@@ -11,7 +11,7 @@ use scam_map_api::clock::FixedClock;
 use scam_map_api::core::identity::Keyring;
 use scam_map_api::db::Database;
 use scam_map_api::license::verify::canonical_bytes;
-use scam_map_api::state::AppState;
+use scam_map_api::state::{AppState, Options};
 use serde_json::{Value, json};
 use std::sync::Arc;
 use time::OffsetDateTime;
@@ -53,18 +53,52 @@ impl TestApp {
 
     /// An app with no licence: every route but /health and /license is locked.
     pub fn unlicensed() -> Self {
+        Self::build(None)
+    }
+
+    /// An unlicensed app that also serves the website built in `web`.
+    pub fn unlicensed_with_web(web: &std::path::Path) -> Self {
+        Self::build(Some(web))
+    }
+
+    /// A licensed app started with the public-server settings.
+    pub async fn with_options(options: Options) -> Self {
+        let app = Self::build_with(None, options);
+        let (status, _) = app
+            .post("/license", &licence("Tests", "2027-11-01T12:00:00+05:30"))
+            .await;
+        assert_eq!(status, StatusCode::OK);
+        app
+    }
+
+    fn build(web: Option<&std::path::Path>) -> Self {
+        Self::build_with(web, Options::default())
+    }
+
+    fn build_with(web: Option<&std::path::Path>, options: Options) -> Self {
         let clock = Arc::new(FixedClock::new(NOW));
-        let state = AppState::new(
+        let state = AppState::with_options(
             Database::in_memory().unwrap(),
             clock.clone(),
             Keyring::new("test-key-0123456789").unwrap(),
             Some(signing_key().verifying_key()),
+            options,
         )
         .unwrap();
-        Self {
-            router: scam_map_api::app(state),
-            clock,
-        }
+        let router = match web {
+            Some(dir) => scam_map_api::app_with_web(state, dir),
+            None => scam_map_api::app(state),
+        };
+        Self { router, clock }
+    }
+
+    /// Status and raw body text, for replies that are not JSON (the website's files).
+    pub async fn get_text(&self, uri: &str) -> (StatusCode, String) {
+        let request = Request::get(uri).body(Body::empty()).unwrap();
+        let response = self.router.clone().oneshot(request).await.unwrap();
+        let status = response.status();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        (status, String::from_utf8_lossy(&bytes).into_owned())
     }
 
     pub async fn send(&self, request: Request<Body>) -> (StatusCode, Value) {

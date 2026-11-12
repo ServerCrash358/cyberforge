@@ -66,6 +66,20 @@ impl Database {
         })
     }
 
+    /// Copies the whole database to `target` while the server keeps running (SQLite's online
+    /// backup), for the nightly backup on the server.
+    ///
+    /// # Errors
+    /// The target cannot be written.
+    pub fn backup_to(&self, target: &Path) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap_or_else(PoisonError::into_inner);
+        conn.backup(
+            rusqlite::MAIN_DB,
+            target,
+            None::<fn(rusqlite::backup::Progress)>,
+        )
+    }
+
     /// Runs `f` with the connection, for reads.
     pub fn read<T>(&self, f: impl FnOnce(&Connection) -> T) -> T {
         f(&self.conn.lock().unwrap_or_else(PoisonError::into_inner))
@@ -136,6 +150,19 @@ mod tests {
             .query_row("PRAGMA journal_mode", [], |r| r.get(0))
             .unwrap();
         assert_eq!(mode, "wal");
+    }
+
+    #[test]
+    fn a_backup_is_a_complete_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(&dir.path().join("live.sqlite")).unwrap();
+        let copy = dir.path().join("copy.sqlite");
+        db.backup_to(&copy).unwrap();
+        let restored = Database::open(&copy).unwrap();
+        let count: i64 = restored
+            .read(|c| c.query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r.get(0)))
+            .unwrap();
+        assert_eq!(count, 7);
     }
 
     #[test]

@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* The Mitigata palette: green on white, near-black text. */
+@theme {
+  --color-brand: #00d884;
+  --color-brand-dark: #00a865;
+  --color-brand-tint: #eefaf4;
+  --color-ink: #1c1c1c;
+  --color-muted: #5f6b66;
+  --color-line: #dfe8e3;
+  --color-page: #fafafa;
+  --color-crit: #d1242f;
+  --color-high: #e8710a;
+  --color-med: #bf8700;
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", "Noto Sans Devanagari", sans-serif;
+}
+
+html,
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}

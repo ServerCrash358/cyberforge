@@ -1,0 +1,47 @@
+# The public server: the app (API and website) behind Caddy, which gets and renews the HTTPS
+# certificate by itself. Run on the VM from the repo root:
+#   docker compose -f infra/compose.yml --env-file infra/.env up -d --build
+# infra/.env (never committed) holds DOMAIN, SCAM_MAP_HMAC_KEY and SCAM_MAP_ADMIN_TOKEN;
+# infra/env.example shows the shape. Steps in infra/README.md.
+# Owner: A. Filled in by: D1.
+
+name: scam-map
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    image: scam-map:latest
+    restart: unless-stopped
+    environment:
+      SCAM_MAP_HMAC_KEY: ${SCAM_MAP_HMAC_KEY:?set SCAM_MAP_HMAC_KEY in infra/.env}
+      SCAM_MAP_ADMIN_TOKEN: ${SCAM_MAP_ADMIN_TOKEN:-}
+      # Every connection comes through Caddy, so the client's address is in X-Forwarded-For.
+      SCAM_MAP_TRUST_PROXY: "1"
+    volumes:
+      - data:/data
+    # Not published: only Caddy reaches it, over the compose network.
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in infra/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:

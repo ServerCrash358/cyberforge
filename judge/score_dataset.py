@@ -32,7 +32,7 @@ from typing import Any
 
 import httpx
 
-from contract import local_server
+from contract import admin_headers, local_server
 from scorecard import NOT_MEASURED, ROWS
 
 HERE = Path(__file__).resolve().parent
@@ -341,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def run(base: str) -> dict[str, list[Result]]:
         out: dict[str, list[Result]] = {}
-        with httpx.Client(base_url=base, timeout=60) as client:
+        with httpx.Client(headers=admin_headers(), base_url=base, timeout=60) as client:
             for i, path in enumerate(paths):
                 keep = args.keep_data and i == len(paths) - 1
                 out[path.stem] = score_dataset(

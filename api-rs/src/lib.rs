@@ -1,4 +1,5 @@
-//! Community Scam Map API in Rust. `app()` builds the router so tests can call it without a socket.
+//! Community Scam Map API in Rust. `app()` builds the router so tests can call it without a socket;
+//! `app_with_web()` also serves the built website.
 
 pub mod activity;
 mod body;
@@ -13,4 +14,14 @@ mod shared;
 pub mod state;
 pub mod store;
 
-pub use routes::router as app;
+use std::path::Path;
+
+/// The API alone.
+pub fn app(state: state::AppState) -> axum::Router {
+    routes::router(state, None)
+}
+
+/// The API and the website built in `web` (the `ui/dist` folder).
+pub fn app_with_web(state: state::AppState, web: &Path) -> axum::Router {
+    routes::router(state, Some(web))
+}

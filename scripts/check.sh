@@ -26,13 +26,13 @@ echo "== Judge (in-process, held-out seeds)"
   uv run python -m scanners.all --target local
   uv run pip-audit)
 
-echo "== Web (Streamlit)"
-(cd web
-  uv sync --frozen
-  uv run ruff check .
-  uv run ruff format --check .
-  uv run mypy --strict .
-  uv run pytest -q -W error
-  uv run pip-audit)
+echo "== Website (React)"
+(cd ui
+  npm ci --no-fund --no-audit --loglevel=error
+  npx biome check .
+  npx tsc -b
+  npx vitest run
+  npm audit --audit-level=low
+  npm run build --silent)
 
 echo "check passed on $(date -u +%F)"

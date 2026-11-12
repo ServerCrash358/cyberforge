@@ -18,7 +18,7 @@ from pathlib import Path
 
 import httpx
 
-from contract import local_server
+from contract import admin_headers, local_server
 from families import FAMILIES
 from generator import Gen
 from runner import load_seeds, run_scenario
@@ -54,7 +54,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.target == "local":
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             folder = Path(tmp)
-            with local_server(folder) as base, httpx.Client(base_url=base, timeout=30) as http:
+            with (
+                local_server(folder) as base,
+                httpx.Client(headers=admin_headers(), base_url=base, timeout=30) as http,
+            ):
                 recorder = responses.Recorder(http)
                 run_traffic(recorder, seeds, salt)
             exchanges = len(recorder.log)
@@ -63,7 +66,9 @@ def main(argv: list[str] | None = None) -> int:
             results["database"] = database.scan(folder, recorder.log)
             results["wording"] = wording.scan(recorder.log)
     else:
-        with httpx.Client(base_url=args.target.rstrip("/"), timeout=30) as http:
+        with httpx.Client(
+            headers=admin_headers(), base_url=args.target.rstrip("/"), timeout=30
+        ) as http:
             recorder = responses.Recorder(http)
             run_traffic(recorder, seeds, salt)
         exchanges = len(recorder.log)

@@ -18,6 +18,7 @@ from typing import Any
 
 import httpx
 
+from contract import admin_headers
 from families import r3_small, t1_bombing
 from families._shared import area_traffic, real_reports, steady_days
 from generator import Gen, Scenario, areas, scam_types
@@ -48,7 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now(UTC)
     tries: list[tuple[str, str, str]] = []
 
-    with httpx.Client(base_url=args.target.rstrip("/"), timeout=30) as client:
+    with httpx.Client(
+        headers=admin_headers(), base_url=args.target.rstrip("/"), timeout=30
+    ) as client:
         if client.post("/admin/reset").status_code != 200:
             print("reset failed: is the API running and licensed?")
             return 1

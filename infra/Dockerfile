@@ -1,38 +1,43 @@
-# API container: FastAPI on uvicorn, SQLite on a mounted /data volume. Build from the repo root:
-#   docker build -f infra/Dockerfile -t scam-map-api .
-# The Streamlit web app is a separate service with its own image (infra/Dockerfile.web, D55).
-# Owner: A. Filled in by: B0 (image), A0 (volume ownership).
+# One image: the React website built, the Rust API built, both in a small runtime image.
+# Build from the repo root (on the server itself, so the binary matches its CPU, x86 or ARM):
+#   docker build -f infra/Dockerfile -t scam-map .
+# The API serves the website at / and the PRD routes beside it. SQLite lives on the /data volume.
+# Owner: A. Filled in by: A0, D1 (Rust and React).
 
-FROM ghcr.io/astral-sh/uv:0.12.7 AS uv
+FROM node:24.19.0-trixie-slim AS website
+WORKDIR /src/ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci --no-fund --no-audit --loglevel=error
+COPY shared /src/shared
+COPY ui ./
+RUN npm run build
 
-FROM python:3.12.10-slim
-COPY --from=uv /uv /usr/local/bin/uv
+FROM rust:1.99.1-slim-trixie AS api
+WORKDIR /src/api-rs
+COPY api-rs ./
+COPY shared /src/shared
+RUN cargo build --release --locked
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PROJECT_ENVIRONMENT=/opt/venv \
-    SCAM_MAP_DB_PATH=/data/scam_map.sqlite \
-    PORT=8000
-
-WORKDIR /srv/api
-COPY api/pyproject.toml api/uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
-
-COPY api/app ./app
-COPY api/migrations ./migrations
-COPY shared /srv/shared
+FROM debian:trixie-slim
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --user-group --uid 10001 app \
+    && mkdir -p /data /data/backups \
+    && chown -R app:app /data
+COPY --from=api /src/api-rs/target/release/scam-map-api /usr/local/bin/scam-map-api
+COPY --from=website /src/ui/dist /srv/web
 COPY infra/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
 
-RUN useradd --system --user-group --uid 10001 app \
-    && mkdir -p /data \
-    && chown app:app /data \
-    && chmod 0755 /usr/local/bin/entrypoint.sh
+ENV SCAM_MAP_DB_PATH=/data/scam_map.sqlite \
+    SCAM_MAP_WEB_DIR=/srv/web \
+    SCAM_MAP_HOST=0.0.0.0 \
+    SCAM_MAP_PORT=8000
 VOLUME ["/data"]
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 
 # Starts as root only to take ownership of /data, then runs the server as the app user.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-# Access logs off: our own log lines carry route, status and timing only (ARCHITECTURE "Privacy").
-CMD ["sh", "-c", "exec /opt/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port \"$PORT\" --no-access-log --proxy-headers --forwarded-allow-ips '*'"]
+CMD ["scam-map-api"]

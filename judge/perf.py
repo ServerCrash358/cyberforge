@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from contract import local_server
+from contract import admin_headers, local_server
 from generator import IST, areas, channels, scam_types
 
 NOTE_WORDS = [
@@ -72,7 +72,7 @@ def run(base: str, args: argparse.Namespace) -> int:
     now = datetime.now(UTC)
     numbers = [rng.choice("6789") + f"{rng.randint(0, 10**9 - 1):09d}" for _ in range(args.numbers)]
     limits = httpx.Limits(max_connections=args.workers, max_keepalive_connections=args.workers)
-    with httpx.Client(base_url=base, timeout=60, limits=limits) as client:
+    with httpx.Client(headers=admin_headers(), base_url=base, timeout=60, limits=limits) as client:
         if args.reports:
             client.post("/admin/reset").raise_for_status()
             started = time.monotonic()

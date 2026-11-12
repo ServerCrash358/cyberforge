@@ -29,3 +29,6 @@ data/urlhaus/
 
 # Rust build output
 target/
+
+# Website build output
+ui/dist/

@@ -4,4 +4,6 @@ mod common;
 mod health;
 mod license;
 mod map_alerts;
+mod public;
 mod reports_lookup;
+mod website;

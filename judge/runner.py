@@ -21,7 +21,7 @@ import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
-from contract import Client, Response, local_server
+from contract import Client, Response, admin_headers, local_server
 from families import FAMILIES
 from generator import Gen, Outcome, Scenario
 from scorecard import CheckResult, ScenarioResult, failing_thresholds, render
@@ -134,9 +134,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.target == "local":
-        with local_server() as base, httpx.Client(base_url=base, timeout=30) as client:
+        with (
+            local_server() as base,
+            httpx.Client(headers=admin_headers(), base_url=base, timeout=30) as client,
+        ):
             return go(client, f"local ({base})")
-    with httpx.Client(base_url=args.target.rstrip("/"), timeout=30) as client:
+    with httpx.Client(
+        headers=admin_headers(), base_url=args.target.rstrip("/"), timeout=30
+    ) as client:
         return go(client, args.target)
 
 

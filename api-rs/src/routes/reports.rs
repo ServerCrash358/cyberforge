@@ -115,10 +115,7 @@ pub async fn create(
     let reported = validate::reported_at(body.reported_at.as_deref(), occurred, now);
     let given_prefix = body.ip_prefix.as_deref().filter(|p| !p.is_empty());
     let prefix = given_prefix.map_or_else(
-        || {
-            let peer = parts.extensions.get::<ConnectInfo<SocketAddr>>();
-            connection_prefix(peer.map(|c| c.0.ip().to_string()).as_deref())
-        },
+        || connection_prefix(client_address(&state, &parts).as_deref()),
         str::to_owned,
     );
     let keys = &state.keys;
@@ -182,6 +179,18 @@ pub async fn create(
             "too many reports from this reporter; try again later",
         )),
     }
+}
+
+/// The caller's address, for reports with no `ip_prefix` (the website's). Behind Caddy, the
+/// connection comes from the proxy, so the address is the last `X-Forwarded-For` entry, the one
+/// Caddy wrote; earlier entries come from the client and are not trusted.
+fn client_address(state: &AppState, parts: &Parts) -> Option<String> {
+    if state.options.trust_proxy {
+        let forwarded = parts.headers.get("x-forwarded-for")?.to_str().ok()?;
+        return forwarded.rsplit(',').next().map(|ip| ip.trim().to_owned());
+    }
+    let peer = parts.extensions.get::<ConnectInfo<SocketAddr>>()?;
+    Some(peer.0.ip().to_string())
 }
 
 /// A short reason for the activity feed, from a rejection message that holds no input.

@@ -1,4 +1,4 @@
-//! The PRD routes (Appendix A) and the website helpers under `/app`.
+//! The PRD routes (Appendix A), the website helpers under `/app`, and the website itself.
 
 mod admin;
 mod alerts;
@@ -15,13 +15,29 @@ use crate::license::gate::licence_gate;
 use crate::state::AppState;
 use axum::Router;
 use axum::middleware::from_fn_with_state;
-use axum::routing::{get, post};
+use axum::routing::{get, get_service, post};
+use std::path::Path;
+use tower_http::services::{ServeDir, ServeFile};
 
-/// Every route the API serves, all behind the licence gate (which lets `/health` and `/license`
-/// through even when expired).
-pub fn router(state: AppState) -> Router {
+/// Every route the API serves, all behind the licence gate (which lets `/health`, `/license` and
+/// the website's own files through even when expired).
+///
+/// With `web`, the built website (`ui/dist`) is served at `/`, `/assets/*` and `/favicon.svg`;
+/// without it, `/` describes the API like `/api` does.
+pub fn router(state: AppState, web: Option<&Path>) -> Router {
+    let site = match web {
+        Some(dir) => Router::new()
+            .route_service("/", get_service(ServeFile::new(dir.join("index.html"))))
+            .route_service(
+                "/favicon.svg",
+                get_service(ServeFile::new(dir.join("favicon.svg"))),
+            )
+            .nest_service("/assets", ServeDir::new(dir.join("assets"))),
+        None => Router::new().route("/", get(app::root)),
+    };
     Router::new()
-        .route("/", get(app::root))
+        .merge(site)
+        .route("/api", get(app::root))
         .route("/health", get(health::health))
         .route("/reports", post(reports::create))
         .route("/lookup", get(lookup::lookup))

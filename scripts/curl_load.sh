@@ -29,7 +29,11 @@ case "$licence" in
   *) echo "the server's licence is not valid: $licence" >&2; exit 1 ;;
 esac
 
-reset() { curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/admin/reset"; }
+# A public server started with SCAM_MAP_ADMIN_TOKEN wants the same token on reset.
+reset() {
+  curl -s -o /dev/null -w '%{http_code}' -X POST ${SCAM_MAP_ADMIN_TOKEN:+-H "x-admin-token: $SCAM_MAP_ADMIN_TOKEN"} \
+    "$BASE/admin/reset"
+}
 empty_now() {  # nothing on the map and no activity: what a reset must leave behind
   [ "$(curl -s "$BASE/map?pincode=560102&radius_km=5000&days=3650")" = '{"clusters":[]}' ] \
     && curl -s "$BASE/app/activity" | grep -q '"events":\[\]'

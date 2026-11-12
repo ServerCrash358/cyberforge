@@ -10,6 +10,12 @@ pub struct Config {
     pub db_path: PathBuf,
     pub hmac_key: Option<String>,
     pub license_public_key: Option<PathBuf>,
+    /// The built website (`ui/dist`) to serve at `/`; none serves the API alone.
+    pub web_dir: Option<PathBuf>,
+    /// `SCAM_MAP_ADMIN_TOKEN`: required on `POST /admin/reset` when set (public servers only).
+    pub admin_token: Option<String>,
+    /// `SCAM_MAP_TRUST_PROXY=1`: read the client address from `X-Forwarded-For` (behind Caddy).
+    pub trust_proxy: bool,
     pub addr: SocketAddr,
 }
 
@@ -32,7 +38,7 @@ impl std::error::Error for ConfigError {}
 
 impl Config {
     /// Reads `SCAM_MAP_DB_PATH`, `SCAM_MAP_HMAC_KEY`, `SCAM_MAP_LICENSE_PUBLIC_KEY`,
-    /// `SCAM_MAP_HOST` and `SCAM_MAP_PORT`.
+    /// `SCAM_MAP_WEB_DIR`, `SCAM_MAP_HOST` and `SCAM_MAP_PORT`.
     ///
     /// # Errors
     /// A host or port that does not parse.
@@ -58,6 +64,9 @@ impl Config {
                 .map_or_else(|| "scam_map.sqlite".into(), PathBuf::from),
             hmac_key: get("SCAM_MAP_HMAC_KEY"),
             license_public_key: get("SCAM_MAP_LICENSE_PUBLIC_KEY").map(PathBuf::from),
+            web_dir: get("SCAM_MAP_WEB_DIR").map(PathBuf::from),
+            admin_token: get("SCAM_MAP_ADMIN_TOKEN").filter(|t| !t.is_empty()),
+            trust_proxy: get("SCAM_MAP_TRUST_PROXY").is_some_and(|v| v == "1"),
             addr: SocketAddr::new(host, port),
         })
     }
@@ -82,6 +91,12 @@ mod tests {
         assert_eq!(c.db_path, PathBuf::from("scam_map.sqlite"));
         assert_eq!(c.addr, "127.0.0.1:8000".parse().unwrap());
         assert_eq!(c.hmac_key, None);
+        assert_eq!(c.admin_token, None);
+        assert!(!c.trust_proxy);
+        assert_eq!(
+            config(&[("SCAM_MAP_ADMIN_TOKEN", "")]).unwrap().admin_token,
+            None
+        );
     }
 
     #[test]
@@ -90,6 +105,9 @@ mod tests {
             ("SCAM_MAP_DB_PATH", "data/x.sqlite"),
             ("SCAM_MAP_HMAC_KEY", "k"),
             ("SCAM_MAP_LICENSE_PUBLIC_KEY", "keys/pub.pem"),
+            ("SCAM_MAP_WEB_DIR", "ui/dist"),
+            ("SCAM_MAP_ADMIN_TOKEN", "secret"),
+            ("SCAM_MAP_TRUST_PROXY", "1"),
             ("SCAM_MAP_HOST", "0.0.0.0"),
             ("SCAM_MAP_PORT", "9000"),
         ])
@@ -97,6 +115,9 @@ mod tests {
         assert_eq!(c.db_path, PathBuf::from("data/x.sqlite"));
         assert_eq!(c.hmac_key.as_deref(), Some("k"));
         assert_eq!(c.license_public_key, Some(PathBuf::from("keys/pub.pem")));
+        assert_eq!(c.web_dir, Some(PathBuf::from("ui/dist")));
+        assert_eq!(c.admin_token.as_deref(), Some("secret"));
+        assert!(c.trust_proxy);
         assert_eq!(c.addr, "0.0.0.0:9000".parse().unwrap());
     }
 
