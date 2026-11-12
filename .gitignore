@@ -4,7 +4,7 @@
 # Secrets: the licence private key never enters the repo
 *.key
 *.pem
-!api/app/license/public_key.pem
+!api-rs/public_key.pem
 .env
 
 # Local databases
